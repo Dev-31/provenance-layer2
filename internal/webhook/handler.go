@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/Dev-31/provenance-layer2/internal/ghclient"
+	"github.com/Dev-31/provenance-layer2/internal/intent"
 	"github.com/Dev-31/provenance-layer2/internal/registry"
 	"github.com/Dev-31/provenance-layer2/internal/verify"
 )
@@ -22,7 +23,8 @@ import (
 type prEvent struct {
 	Action      string `json:"action"`
 	PullRequest struct {
-		Number int `json:"number"`
+		Number int    `json:"number"`
+		Body   string `json:"body"`
 		Head   struct {
 			SHA string `json:"sha"`
 			Ref string `json:"ref"`
@@ -111,7 +113,15 @@ func processPR(evt prEvent) {
 	}
 
 	result := verify.Verify(manifestJSON, pubKey, headSHA)
-	postAndSetStatus(ctx, client, owner, repo, prNum, headSHA, result)
+	driftResult := intent.Check(ctx, evt.PullRequest.Body, "")
+	comment := ghclient.FormatCommentWithDrift(result, driftResult)
+	if err := client.PostComment(ctx, owner, repo, prNum, comment); err != nil {
+		log.Printf("postAndSetStatus: post comment: %v", err)
+	}
+	state, description := statusFromResult(result)
+	if err := client.SetStatus(ctx, owner, repo, headSHA, state, description); err != nil {
+		log.Printf("postAndSetStatus: set status: %v", err)
+	}
 }
 
 func postAndSetStatus(ctx context.Context, client *ghclient.Client, owner, repo string, prNum int, headSHA string, result verify.Result) {

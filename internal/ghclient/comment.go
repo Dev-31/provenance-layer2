@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/Dev-31/provenance-layer1/manifest"
+	"github.com/Dev-31/provenance-layer2/internal/intent"
 	"github.com/Dev-31/provenance-layer2/internal/verify"
 )
 
@@ -127,4 +128,22 @@ func testsCell(v manifest.VerificationInfo) string {
 		return fmt.Sprintf("✅ %s", label)
 	}
 	return fmt.Sprintf("❌ FAIL (exit %d)", v.TestExitCode)
+}
+
+// FormatCommentWithDrift is FormatComment with an optional intent-drift section appended.
+func FormatCommentWithDrift(result verify.Result, drift intent.Result) string {
+	base := FormatComment(result)
+	if drift.Verdict == "" {
+		return base
+	}
+	var icon string
+	switch drift.Verdict {
+	case intent.VerdictMatches:
+		icon = "✅"
+	case intent.VerdictDrifts:
+		icon = "⚠️"
+	default:
+		icon = "❓"
+	}
+	return base + fmt.Sprintf("\n**Intent check:** %s %s — %s\n", icon, drift.Verdict, drift.Reason)
 }
